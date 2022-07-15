@@ -79,13 +79,14 @@ Tracking::Tracking(
             mnLastRelocFrameId(0)                                   // 恢复为0，没有进行这个过程的时候的默认值
 {
     // Load camera parameters from settings file
-    // step1 从配置文件中加载相机参数
+    // sstep1 从配置文件中加载相机参数
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
     float fx = fSettings["Camera.fx"];
     float fy = fSettings["Camera.fy"];
     float cx = fSettings["Camera.cx"];
     float cy = fSettings["Camera.cy"];
 
+    // 相机内参矩阵 K
     cv::Mat K = cv::Mat::eye(3,3,CV_32F);
     K.at<float>(0,0) = fx;
     K.at<float>(1,1) = fy;
@@ -142,7 +143,7 @@ Tracking::Tracking(
         cout << "- color order: BGR (ignored if grayscale)" << endl;
 
     // Load ORB parameters
-    // step2 加载ORB特征点有关的参数，并新建特征点提取器
+    // sstep2 加载ORB特征点有关的参数，并新建特征点提取器
 
     // 第一帧提取的特征点数 1000
     int nFeatures = fSettings["ORBextractor.nFeatures"];
@@ -176,14 +177,15 @@ Tracking::Tracking(
     if(sensor==System::STEREO || sensor==System::RGBD)
     {
         // 判断一个3D 点远/近的阈值 mbf * 35 / fx 
-        // ThDepth就是表示基线长度的多少倍
+        // bf baseline*f, 阈值=红外视频流帧数×深度阈值/相机参数fx
+        // ? ThDepth就是表示基线长度的多少倍
         mThDepth = mbf*(float)fSettings["ThDepth"]/fx;
         cout << endl << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
     }
 
     if(sensor==System::RGBD)
     {
-        // 深度相机disparity转化为depth时的因子
+        // 深度相机disparity转化为depth时的因子 z = fb/d d为视差，b为基线
         mDepthMapFactor = fSettings["DepthMapFactor"];
         if(fabs(mDepthMapFactor)<1e-5)
             mDepthMapFactor=1;
@@ -211,12 +213,22 @@ void Tracking::SetViewer(Viewer *pViewer)
     mpViewer=pViewer;
 }
 
-
+/**
+ * @brief 输入为左右图像，可以为RGB、BGR、RGBA、GRAY、
+ * 1. 将图像转为mImGray 和 mImGrayRight 并初始化 mCurrentFrame
+ * 2. 进行tracking 过程
+ * 
+ * @param imRectLeft    左图像
+ * @param imRectRight   右图像
+ * @param timestamp     时间戳
+ * @return cv::Mat      世界坐标系到该帧相机坐标系的位姿  
+ */
 cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp)
 {
     mImGray = imRectLeft;
     cv::Mat imGrayRight = imRectRight;
 
+    // sstep1 将RGB或BGR图像转为灰度图
     if(mImGray.channels()==3)
     {
         if(mbRGB)
@@ -230,6 +242,7 @@ cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRe
             cvtColor(imGrayRight,imGrayRight,CV_BGR2GRAY);
         }
     }
+    // 如果是四通道图像
     else if(mImGray.channels()==4)
     {
         if(mbRGB)
@@ -244,19 +257,41 @@ cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRe
         }
     }
 
-    mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    // sstep2 构造图像帧
+    mCurrentFrame = Frame(mImGray,              // 左目图像
+                          imGrayRight,          // 右目图像
+                          timestamp,            // 时间戳
+                          mpORBextractorLeft,   // 左目特征提取器
+                          mpORBextractorRight,
+                          mpORBVocabulary,      // ORB字典
+                          mK,                   // 相机内参矩阵
+                          mDistCoef,            // 相机畸变参数
+                          mbf,                  // 基线长度
+                          mThDepth);            // 远点、近点的区分阈值
 
+    // sstep3 跟踪
     Track();
 
+    // 返回当前帧相机位姿
     return mCurrentFrame.mTcw.clone();
 }
 
 
+/**
+ * @brief 输入左目RGB或RGBA图像和深度图
+ * 1. 将图像转为mImGray 和 mImGrayRight 并初始化 mCurrentFrame
+ * 2. 进行tracking 过程
+ * @param imRGB         左目图像
+ * @param imD           深度图像
+ * @param timestamp     时间戳
+ * @return cv::Mat      世界坐标系到相机坐标系的位姿
+ */
 cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp)
 {
     mImGray = imRGB;
     cv::Mat imDepth = imD;
 
+    // sstep1 将RGB或RGBA图像转为灰度图
     if(mImGray.channels()==3)
     {
         if(mbRGB)
@@ -272,21 +307,26 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
 
+    // sstep2 将相机的视差转为深度，即转为真正尺度下的深度
     if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F)
         imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
 
+    // sstep3 构造当前图像帧
     mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
+    // sstep4 跟踪线程
     Track();
 
+    // sstep5 返回位姿
     return mCurrentFrame.mTcw.clone();
 }
 
-
+// 单目图像世界坐标系到相机坐标系的位姿
 cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
 {
     mImGray = im;
 
+    // sstep1 图像转换：若图像是3、4通道的，还需转换为灰度图
     if(mImGray.channels()==3)
     {
         if(mbRGB)
@@ -302,13 +342,18 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
 
+    // sstep2 构造图像帧：判断该帧是不是初始化
+    // 没有成功初始化的前一个状态是 NO_IMAGES_YET
+    // mpIniORBextractor：初始化单目ORB特征提取器会提取指定数目的两倍特征点
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
         mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
     else
         mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
+    // sstep3 追踪线程
     Track();
 
+    // 返回位姿
     return mCurrentFrame.mTcw.clone();
 }
 

@@ -109,22 +109,32 @@ System::System(const string &strVocFile,                    // 字典文件路�
                              mSensor);              // 传感器类型 iomanip
 
     //Initialize the Local Mapping thread and launch
-    mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
-    mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
+    mpLocalMapper = new LocalMapping(mpMap,                     // 指定使 iomanip
+                                        mSensor==MONOCULAR);    // TODO 为什么设置成MONOCULAR？
+    mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,     // 这个线程会调用的函数
+                                        mpLocalMapper);             // 这个调用函数的参数
 
     //Initialize the Loop Closing thread and launch
-    mpLoopCloser = new LoopClosing(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);
+    mpLoopCloser = new LoopClosing(mpMap,                   // 地图
+                                   mpKeyFrameDatabase,      // 关键帧数据库
+                                   mpVocabulary,            // ORB字典
+                                   mSensor!=MONOCULAR);     // 当前的传感器是否是单目
     mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
 
     //Initialize the Viewer thread and launch
     if(bUseViewer)
     {
-        mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
-        mptViewer = new thread(&Viewer::Run, mpViewer);
-        mpTracker->SetViewer(mpViewer);
+        mpViewer = new Viewer(this,                     // ? this 作用
+                              mpFrameDrawer,            // 帧绘制器
+                              mpMapDrawer,              // 地图绘制器
+                              mpTracker,                // 追踪器
+                              strSettingsFile);         // 配置文件
+        mptViewer = new thread(&Viewer::Run, mpViewer); // 新建viewer线程
+        mpTracker->SetViewer(mpViewer);                 // 给运动追踪器设置其查看器
     }
 
     //Set pointers between threads
+    // ? 设置进程间指针
     mpTracker->SetLocalMapper(mpLocalMapper);
     mpTracker->SetLoopClosing(mpLoopCloser);
 

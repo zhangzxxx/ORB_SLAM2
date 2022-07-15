@@ -1,122 +1,259 @@
-{
-    "todo-tree.tree.showScanModeButton": true,
-    //todo-tree settings
-    // //Globs，用于通过排除限制搜索结果（在**includeGlobs**之后应用），例如`["**/*.txt"]`忽略所有.txt文件
-    "todo-tree.filtering.excludeGlobs": [
-        "/**/node_modules/",
-        "**/*.txt",
-	    "**/*.md"
-    ],
-    //在树中显示待办事项的计数
-    "todo-tree.tree.showCountsInTree": true,
-    // 在树形视图标题上显示一个按钮，以在仅扫描打开的文件或整个工作区之间进行切换。
-    "todo-tree.tree.scanMode": "workspace",
-    // "todo-tree.tree.showScanOpenFilesOrWorkspaceButton": true,
-    // "todo-tree.regex.regex": "(/\\*)\\s*($TAGS).*(\\n\\s*(//|/\\*|\\*\\*)\\s{2,}.*)*",
-    // "todo-tree.regex.regex": "((//|#|<!--|;|/\\*|\\*|^)\\s*($TAGS)|^\\s*- \\[ \\])",
-    "todo-tree.regex.regex": "((//|#|<!--|;|/\\*|\\*|^)\\s*($TAGS)|^\\s*- \\[ \\])",
-    "todo-tree.general.tags": [
-        "TODO",
-        "FIXME",
-        "TAG",
-        "DONE",
-        "NOTE",
-        "WARN",
-        // "!",
-        "sstep",
-        "?"
-    ],
-    "todo-tree.regex.regexCaseSensitive": false,
-    //树项的格式 ${filename} ${line}, ${column}, ${tag}, ${before} ${after}
-    "todo-tree.tree.labelFormat": "${tag}",
-    // 突出显示标签是可配置的。使用 todo-tree.highlights.defaultHighlight 设立亮点所有标签。defaultHighlight，customHighlight，允许使用使用以下值
-    "todo-tree.highlights.defaultHighlight": {
-        //  注意：前景和背景颜色可以是“红色”，“绿色”，“蓝色”，“黄色”，“洋红色”，“青色”，“灰色”，“白色”或“黑色”之一。也可以使用RGB值（例如“＃80FF00”）。您还可以使用当前主题的颜色，例如peekViewResult.background。
-        "foreground": "peekViewResult.background", // foreground -用于在编辑器中设置高光和标尺中的标记的前景色。
-        "background": "yellow", // background -用于在编辑器中设置突出显示的背景颜色。
-        "opacity": "100", // opacity-与背景色一起使用的百分比值。100％会产生不透明的背景，这会模糊选择和其他装饰。注意：使用主题颜色时，不透明度将被忽略。
-        //  fontWeight，fontStyle，textDecoration-可以用来风格，标准的CSS值的亮点
-        //  borderRadius -用于设置高光背景的边框半径。
-        "icon": "todo-tree", // 参见这个页面，如果是 <%= octicon "alert" %> 一个图标 name下面就写 alert ,icon-用于在树状视图中设置其他图标。必须是有效的octicon（请参阅https://octicons.github.com/）。如果无效，则默认为刻度。如果要使用活动视图中的图标，也可以使用“ todo-tree”或“ todo-tree-filled”。
-        //  "rulerColour": "yellow",//rulerColour-用于设置右侧拖动条中标记的颜色。如果未指定，它将使用前景色。
-        "type": "tag",
-        "iconColour": "yellow",
-    },
-    "todo-tree.general.revealBehaviour": "highlight todo",
-	"todo-tree.tree.showCountsInTree": true,
-    // 如果您需要不同地配置各个标签，请使用 todo-tree.highlights.customHighlight
-    "todo-tree.highlights.customHighlight": {
+// {
+//     "todo-tree.tree.showScanModeButton": true,
+//     //todo-tree settings
+//     // //Globs，用于通过排除限制搜索结果（在**includeGlobs**之后应用），例如`["**/*.txt"]`忽略所有.txt文件
+//     "todo-tree.filtering.excludeGlobs": [
+//         "/**/node_modules/",
+//         "**/*.txt",
+// 	    "**/*.md"
+//     ],
+//     //在树中显示待办事项的计数
+//     "todo-tree.tree.showCountsInTree": true,
+//     // 在树形视图标题上显示一个按钮，以在仅扫描打开的文件或整个工作区之间进行切换。
+//     "todo-tree.tree.scanMode": "workspace",
+//     // "todo-tree.tree.showScanOpenFilesOrWorkspaceButton": true,
+//     // "todo-tree.regex.regex": "(/\\*)\\s*($TAGS).*(\\n\\s*(//|/\\*|\\*\\*)\\s{2,}.*)*",
+//     // "todo-tree.regex.regex": "((//|#|<!--|;|/\\*|\\*|^)\\s*($TAGS)|^\\s*- \\[ \\])",
+//     "todo-tree.regex.regex": "((//|#|<!--|;|/\\*|\\*|^)\\s*($TAGS)|^\\s*- \\[ \\])",
+//     "todo-tree.general.tags": [
+//         "TODO",
+//         "FIXME",
+//         "TAG",
+//         "DONE",
+//         "NOTE",
+//         "WARN",
+//         // "!",
+//         "sstep",
+//         "?",
+//         "c++11"
+//     ],
+//     "todo-tree.regex.regexCaseSensitive": false,
+//     //树项的格式 ${filename} ${line}, ${column}, ${tag}, ${before} ${after}
+//     "todo-tree.tree.labelFormat": "${tag}",
+//     // 突出显示标签是可配置的。使用 todo-tree.highlights.defaultHighlight 设立亮点所有标签。defaultHighlight，customHighlight，允许使用使用以下值
+//     "todo-tree.highlights.defaultHighlight": {
+//         //  注意：前景和背景颜色可以是“红色”，“绿色”，“蓝色”，“黄色”，“洋红色”，“青色”，“灰色”，“白色”或“黑色”之一。也可以使用RGB值（例如“＃80FF00”）。您还可以使用当前主题的颜色，例如peekViewResult.background。
+//         "foreground": "peekViewResult.background", // foreground -用于在编辑器中设置高光和标尺中的标记的前景色。
+//         // "background": "yellow", // background -用于在编辑器中设置突出显示的背景颜色。
+//         "opacity": "100", // opacity-与背景色一起使用的百分比值。100％会产生不透明的背景，这会模糊选择和其他装饰。注意：使用主题颜色时，不透明度将被忽略。
+//         //  fontWeight，fontStyle，textDecoration-可以用来风格，标准的CSS值的亮点
+//         //  borderRadius -用于设置高光背景的边框半径。
+//         "icon": "todo-tree", // 参见这个页面，如果是 <%= octicon "alert" %> 一个图标 name下面就写 alert ,icon-用于在树状视图中设置其他图标。必须是有效的octicon（请参阅https://octicons.github.com/）。如果无效，则默认为刻度。如果要使用活动视图中的图标，也可以使用“ todo-tree”或“ todo-tree-filled”。
+//         //  "rulerColour": "yellow",//rulerColour-用于设置右侧拖动条中标记的颜色。如果未指定，它将使用前景色。
+//         "type": "tag",
+//         "iconColour": "yellow",
+//     },
+//     "todo-tree.general.revealBehaviour": "highlight todo",
+// 	"todo-tree.tree.showCountsInTree": true,
+//     // 如果您需要不同地配置各个标签，请使用 todo-tree.highlights.customHighlight
+//     "todo-tree.highlights.customHighlight": {
         
-        "TODO": {
-            //  "foreground": "#ff9900",
-            "background": "yellow",
-            "icon": "check",
-            "iconColour": "yellow",
-            //  rulerColour-用于设置右侧拖动条中标记的颜色。如果未指定，它将使用前景色(foreground)。
-            "rulerColour": "yellow",
-            //  rulerLane 用于在右侧拖动条中设置标记的车道。如果未指定，它将默认为右侧车道。使用 left ， center ， right 或 full 之一。您也可以使用 none 禁用标尺标记。
-            "rulerLane": "full",
-        },
-        "FIXME": {
-            "background": "#FF0000",
-            "icon": "beaker",
-            "rulerColour": "#FF0000",
-            "iconColour": "#FF0000",
-            "rulerLane": "full"
-        },
-        "TAG": {
-            "background": "#317DD5",
-            "icon": "tag",
-            "rulerColour": "#317DD5",
-            "iconColour": "#317DD5",
-            "rulerLane": "full"
-        },
-        "NOTE": {
-            "background": "#E6E6E6",
-            "icon": "note",
-            "rulerColour": "#E6E6E6",
-            "iconColour": "#E6E6E6",
-            "rulerLane": "full"
-        },
-        "DONE": {
-            "background": "#7FBA00",
-            "icon": "issue-closed",
-            "rulerColour": "#7FBA00",
-            "iconColour": "#7FBA00",
-            "rulerLane": "full"
-        },
-        "WARN": {
-            //  侧边设置
-            "icon": "alert",
-            "iconColour": "#E63900",
-            //  文档内容设置
-            "background": "#E63900",
-            "rulerColour": "#E63900",
-            "rulerLane": "full",
-        },
-        "sstep": {
-            "background": "#7FBA00",
-            "icon": "issue-closed",
-            "rulerColour": "#7FBA00",
-            "iconColour": "#7FBA00",
-            "rulerLane": "full",
-            "hideFromTree": true,
-            "type": "text-and-comment"      // 注释颜色也一样
-        },
-        "?": {
-            "background": "#E63900",
-            "icon": "issue-closed",
-            "rulerColour": "#E63900",
-            "iconColour": "#E63900",
-            "rulerLane": "full"
-        },
-        // "!": {
-        //     "background": "#e63a00ad",
-        //     "icon": "issue-closed",
-        //     "rulerColour": "#e63a00ad",
-        //     "iconColour": "#e63a00ad",
-        //     "rulerLane": "full"
-        // }
-    },
+//         "TODO": {
+//             //  "foreground": "#ff9900",
+//             "background": "yellow",
+//             "icon": "check",
+//             "iconColour": "yellow",
+//             //  rulerColour-用于设置右侧拖动条中标记的颜色。如果未指定，它将使用前景色(foreground)。
+//             "rulerColour": "yellow",
+//             //  rulerLane 用于在右侧拖动条中设置标记的车道。如果未指定，它将默认为右侧车道。使用 left ， center ， right 或 full 之一。您也可以使用 none 禁用标尺标记。
+//             "rulerLane": "full",
+//         },
+//         "FIXME": {
+//             "background": "#FF0000",
+//             "icon": "beaker",
+//             "rulerColour": "#FF0000",
+//             "iconColour": "#FF0000",
+//             "rulerLane": "full"
+//         },
+//         "TAG": {
+//             "background": "#317DD5",
+//             "icon": "tag",
+//             "rulerColour": "#317DD5",
+//             "iconColour": "#317DD5",
+//             "rulerLane": "full"
+//         },
+//         "NOTE": {
+//             "background": "#E6E6E6",
+//             "icon": "note",
+//             "rulerColour": "#E6E6E6",
+//             "iconColour": "#E6E6E6",
+//             "rulerLane": "full"
+//         },
+//         "DONE": {
+//             "background": "#7FBA00",
+//             "icon": "issue-closed",
+//             "rulerColour": "#7FBA00",
+//             "iconColour": "#7FBA00",
+//             "rulerLane": "full"
+//         },
+//         "WARN": {
+//             //  侧边设置
+//             "icon": "alert",
+//             "iconColour": "#E63900",
+//             //  文档内容设置
+//             "background": "#E63900",
+//             "rulerColour": "#E63900",
+//             "rulerLane": "full",
+//         },
+//         "sstep": {
+//             "background": "#7FBA00",
+//             // "foreground": "#7FBA00",
+//             "icon": "issue-closed",
+//             "rulerColour": "#7FBA00",
+//             "iconColour": "#7FBA00",
+//             "hideFromTree": true,
+//             "type": "text-and-comment"      // 注释颜色也一样
+//         },
+//         "?": {
+//             "background": "#E63900",
+//             "icon": "issue-closed",
+//             "rulerColour": "#E63900",
+//             "iconColour": "#E63900",
+//             "type": "text-and-comment"
+//             // "rulerLane": "full"
+//         },
+//         "c++11": {
+//             "background": "#de00e6",
+//             "icon": "issue-closed",
+//             "rulerColour": "#de00e6",
+//             "iconColour": "#de00e6",
+//             "type":"text-and-comment"
+//         },
+//         // "!": {
+//         //     "background": "#e63a00ad",
+//         //     "icon": "issue-closed",
+//         //     "rulerColour": "#e63a00ad",
+//         //     "iconColour": "#e63a00ad",
+//         //     "rulerLane": "full"
+//         // }
+//     },
+//     "files.associations": {
+//         "ostream": "cpp"
+//     },
 
+// }
+
+
+
+{
+    "doxdocgen.generic.paramTemplate": "@param[in] {param} ",
+	"todo-tree.highlights.defaultHighlight": {
+	"icon": "alert",
+	"type": "text",
+	"foreground": "red",
+	"iconColour": "green"
+	},
+    "todo-tree.regex.regex": "((//|#|<!--|;|/\\*|\\*|^)\\s*($TAGS)|^\\s*- \\[ \\])",
+	"todo-tree.general.tags": [
+	"?",
+	"sstep",
+    "c++11",
+    "todo",
+    "note",
+    "bug"
+	],
+	"todo-tree.highlights.customHighlight": {
+	"sstep": {
+	"foreground": "#7CFC00",
+	"icon": "question",
+	"iconColour": "green",
+	"type": "text-and-comment",
+	"hideFromTree": true
+	},
+	"?": {
+	"foreground": "red",
+	"icon": "question",
+	"iconColour": "red",
+	"type": "text-and-comment"
+	},
+	"bug": {
+	"foreground": "red",
+	"icon": "issue-opened",
+	"iconColour": "red",
+	"type": "text-and-comment"
+	},
+    "c++11":{
+        "foreground": "#fc00d2",
+        "icon": "c++11",
+        "iconColour": "#fc00d2",
+        "type": "text-and-comment"
+    },
+    "note":{
+        "foreground": "#00fcef",
+        "icon": "c++11",
+        "iconColour": "#00fcef",
+        "type": "text-and-comment"
+    }
+	},
+	"todo-tree.general.revealBehaviour": "highlight todo",
+	"todo-tree.tree.showCountsInTree": true,
+	"todo-tree.filtering.excludeGlobs":[
+	"**/*.txt",
+	"**/*.md"
+	],
+	"files.associations": {
+		"*.cc": "cpp",
+		"vector": "cpp",
+		"mutex": "cpp",
+		"list": "cpp",
+		"xtree": "cpp",
+		"map": "cpp",
+		"algorithm": "cpp",
+		"bitset": "cpp",
+		"cctype": "cpp",
+		"chrono": "cpp",
+		"cmath": "cpp",
+		"concepts": "cpp",
+		"cstdarg": "cpp",
+		"cstddef": "cpp",
+		"cstdint": "cpp",
+		"cstdio": "cpp",
+		"cstdlib": "cpp",
+		"cstring": "cpp",
+		"ctime": "cpp",
+		"cwchar": "cpp",
+		"deque": "cpp",
+		"exception": "cpp",
+		"fstream": "cpp",
+		"initializer_list": "cpp",
+		"iomanip": "cpp",
+		"ios": "cpp",
+		"iosfwd": "cpp",
+		"iostream": "cpp",
+		"istream": "cpp",
+		"iterator": "cpp",
+		"limits": "cpp",
+		"memory": "cpp",
+		"new": "cpp",
+		"numeric": "cpp",
+		"ostream": "cpp",
+		"queue": "cpp",
+		"ratio": "cpp",
+		"set": "cpp",
+		"sstream": "cpp",
+		"stack": "cpp",
+		"stdexcept": "cpp",
+		"streambuf": "cpp",
+		"string": "cpp",
+		"system_error": "cpp",
+		"thread": "cpp",
+		"tuple": "cpp",
+		"type_traits": "cpp",
+		"typeinfo": "cpp",
+		"unordered_map": "cpp",
+		"utility": "cpp",
+		"xfacet": "cpp",
+		"xhash": "cpp",
+		"xiosbase": "cpp",
+		"xlocale": "cpp",
+		"xlocinfo": "cpp",
+		"xlocmon": "cpp",
+		"xlocnum": "cpp",
+		"xloctime": "cpp",
+		"xmemory": "cpp",
+		"xstddef": "cpp",
+		"xstring": "cpp",
+		"xtr1common": "cpp",
+		"xutility": "cpp"
+	}
 }
