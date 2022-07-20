@@ -129,28 +129,44 @@ static float IC_Angle(const Mat& image, Point2f pt,  const vector<int> & u_max)
     return fastAtan2((float)m_01, (float)m_10);
 }
 
-
+// 乘数因子，一度对应多少弧度
 const float factorPI = (float)(CV_PI/180.f);
+/**
+ * @brief 计算关键点ORB描述子
+ * 
+ * @param[in] kpt   关键点
+ * @param[in] img   图像
+ * @param[in] pattern   随机点集
+ * @param[in] desc      描述子
+ */
 static void computeOrbDescriptor(const KeyPoint& kpt,
                                  const Mat& img, const Point* pattern,
                                  uchar* desc)
 {
+    // 关键点方向，单位弧度
     float angle = (float)kpt.angle*factorPI;
     float a = (float)cos(angle), b = (float)sin(angle);
 
+    // 获取图像关键点中心指针
     const uchar* center = &img.at<uchar>(cvRound(kpt.pt.y), cvRound(kpt.pt.x));
+    // 获取图像每行的字节数
     const int step = (int)img.step;
 
+    // 原始的BRIEF描述子没有方向不变性，通过加入关键点的方向来计算描述子，称之为Steer BRIEF，具有极好旋转不变性
+    // 具体地，在计算的时候需要将这里选取的采样模板中点的x轴方向旋转到特征点方向。
+    // 获取采样点中某个idx所对应的点的灰度值，这里旋转前的坐标为(x, y)，旋转后的坐标为(x', y') x'=xcos(theta) - ysin(theta), y'=xsin(theta) + ycos(theta)
+    // 下面表示 y'*step + x'
     #define GET_VALUE(idx) \
         center[cvRound(pattern[idx].x*b + pattern[idx].y*a)*step + \
                cvRound(pattern[idx].x*a - pattern[idx].y*b)]
 
-
+    // 每个关键点BRIEF由32*8位构成
+    // 其中每一位来自两个像素点灰度值的直接比较，所以每比较出8bit结果，需要16个随机点，这也是为什么pattern需要 +=16 的原因
     for (int i = 0; i < 32; ++i, pattern += 16)
     {
-        int t0, t1, val;
+        int t0, t1, val;                // 参与比较的2个特征点的灰度值，以及比较结果0或1
         t0 = GET_VALUE(0); t1 = GET_VALUE(1);
-        val = t0 < t1;
+        val = t0 < t1;                              // 描述子本字节的bit0
         t0 = GET_VALUE(2); t1 = GET_VALUE(3);
         val |= (t0 < t1) << 1;
         t0 = GET_VALUE(4); t1 = GET_VALUE(5);
@@ -164,15 +180,17 @@ static void computeOrbDescriptor(const KeyPoint& kpt,
         t0 = GET_VALUE(12); t1 = GET_VALUE(13);
         val |= (t0 < t1) << 6;
         t0 = GET_VALUE(14); t1 = GET_VALUE(15);
-        val |= (t0 < t1) << 7;
+        val |= (t0 < t1) << 7;                      // 描述子本字节的bit7
 
+        // 保存当前比较出来的描述子的这个字节
         desc[i] = (uchar)val;
     }
 
+    // 为了避免和程序中其他部分冲突，使用完之后就取消这个宏定义
     #undef GET_VALUE
 }
 
-
+// 预先定义好的随机点集，256是值可以提取出256bit的描述子信息，每个bit由一对点比较得来，4=2*2，前面的2是指两个点进行比较，后面的2是指一个点有两个坐标
 static int bit_pattern_31_[256*4] =
 {
     8,-3, 9,5/*mean (0), correlation (0)*/,
@@ -671,7 +689,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
                                        const int &maxX, const int &minY, const int &maxY, const int &N, const int &level)
 {
     // Compute how many initial nodes   
-    // sstep1 根据宽高比例确定初始节点数目
+    // Step1 根据宽高比例确定初始节点数目
     // width = maxBorderX - minBorderX; 原始图像宽752， 可提取的特征图像宽752-32=720    maxBorderX=736，minBorderX=16
     // heigh = maxBorderY - minBorderY; 原始图像高480， 可提取的特征图像宽为480-32=448
     // 计算应该生成的初始节点的个数，根节点的数量nIni是根据边界的宽高比值确定的，一般是1或2
@@ -687,7 +705,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
     vector<ExtractorNode*> vpIniNodes;
     vpIniNodes.resize(nIni);
 
-    // sstep2 生成初始提取器节点
+    // Step2 生成初始提取器节点
     // 存储每个节点的起始点坐标和终止点坐标
     // (UL.x, UL.y) = (0, 0)  ...... (UR.x, UR.y) = (360, 0) (UR.x, UR.y) = (360, 0)     ...... (UR.x, UR.y) = (720, 0)
     // (BL.x, BL.y) = (0, 448)...... (BR.x, BR.y) = (360, 448) (BR.x, BR.y) = (360, 448) ...... (BR.x, BR.y) = (720, 448)
@@ -712,7 +730,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
     }
 
     //Associate points to childs
-    // sstep3 将特征点分配到子提取器节点中
+    // Step3 将特征点分配到子提取器节点中
     for(size_t i=0;i<vToDistributeKeys.size();i++)
     {
         // 获取这个特征点对象
@@ -722,7 +740,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
         vpIniNodes[kp.pt.x/hX]->vKeys.push_back(kp);
     }
 
-    // sstep4 遍历此提取器节点列表，标记那些不可再分裂的节点，删除那些没有分配到特征点的节目的
+    // Step4 遍历此提取器节点列表，标记那些不可再分裂的节点，删除那些没有分配到特征点的节目的
     // ? 这个过程是否可以通过判断 nIni个数和vKeys.size()来完成
     list<ExtractorNode>::iterator lit = lNodes.begin();
 
@@ -756,7 +774,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
     // 调整大小，将一个初始化节点“分裂”成4个
     vSizeAndPointerToNode.reserve(lNodes.size()*4);
 
-    // sstep5 利用四叉树方法对图像进行划分区域，均匀分配特征点
+    // Step5 利用四叉树方法对图像进行划分区域，均匀分配特征点
     while(!bFinish)
     {
         // 更新迭代次数计数器，只是记录，没有起到作用
@@ -858,7 +876,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
             // 结束标志位
             bFinish = true;
         }
-        // sstep6 当再划分之后所有的节点数大于要求数目时，就慢慢划分知道使其刚刚达到或者超过要求的特征点个数
+        // Step6 当再划分之后所有的节点数大于要求数目时，就慢慢划分知道使其刚刚达到或者超过要求的特征点个数
         // 可以展开的子节点个数 nToExpand*3，是因为1分为四之后，会删除原来的主节点，所以乘以3
         /**
          * // ? nToExpand是一直累计的。如果因为特征点过少，跳过了下面的else-if，又进行了一次上面的while循环 遍历list操作之后，lNode.size()增加了，nToExpand也增加
@@ -952,7 +970,7 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree(const vector<cv::KeyPoint>&
     }   //利用4叉树方法对图像进行划分区域
 
     // Retain the best point in each node
-    // sstep7 保留每个区域内响应值最大的特征点
+    // Step7 保留每个区域内响应值最大的特征点
     // 使用vector存储感兴趣的特征点过滤的结果
     vector<cv::KeyPoint> vResultKeys;
     // 重置大小为要提取的特征点数目
@@ -1415,22 +1433,39 @@ void ORBextractor::ComputeKeyPointsOld(std::vector<std::vector<KeyPoint> > &allK
 static void computeDescriptors(const Mat& image, vector<KeyPoint>& keypoints, Mat& descriptors,
                                const vector<Point>& pattern)
 {
+    // 清空保存描述子信息的容器
     descriptors = Mat::zeros((int)keypoints.size(), 32, CV_8UC1);
 
+    // 遍历所有关键点，计算ORB描述子
     for (size_t i = 0; i < keypoints.size(); i++)
-        computeOrbDescriptor(keypoints[i], image, &pattern[0], descriptors.ptr((int)i));
+        computeOrbDescriptor(keypoints[i],              // 关键点
+                             image,                     // 图像
+                             &pattern[0],               // 随机点集的首地址
+                             descriptors.ptr((int)i));  // 提取出来的描述子保存地址
 }
 
+/**
+ * @brief 用仿函数（通过重载括号运算符）来计算图像特征点
+ * 
+ * @param[in] _image            计算图像
+ * @param[in] _mask             掩码mask
+ * @param[in] _keypoints        关键点
+ * @param[in] _descriptors      关键点对应描述子
+ */
 void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPoint>& _keypoints,
                       OutputArray _descriptors)
 { 
+    // Step1 检查图像有效性
     if(_image.empty())
         return;
 
+    // 获取图像大小
     Mat image = _image.getMat();
+    // 判断图像格式是否正确，要求是单通道图像
     assert(image.type() == CV_8UC1 );
 
     // Pre-compute the scale pyramid
+    // Step2 构建图像金字塔
     ComputePyramid(image);
 
     vector < vector<KeyPoint> > allKeypoints;
@@ -1485,29 +1520,73 @@ void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPo
     }
 }
 
+/**
+ * @brief 构建图像金字塔
+ * 
+ * @param[in] image 输入图像，这个输入图像所有像素都是有效的，也就是说可以在其上提取出FAST角点的
+ */
 void ORBextractor::ComputePyramid(cv::Mat image)
 {
+    // 开始遍历所有图层
     for (int level = 0; level < nlevels; ++level)
     {
+        // 获取本层图像缩放系数
         float scale = mvInvScaleFactor[level];
+        // 计算本层图像像素尺寸大小
         Size sz(cvRound((float)image.cols*scale), cvRound((float)image.rows*scale));
+        // 全尺寸图像，包括无效图像区域，将图像“补边”，EDGE_THRESHOLD=19=16+3 该区域外的图像不进行FAST角点检测
         Size wholeSize(sz.width + EDGE_THRESHOLD*2, sz.height + EDGE_THRESHOLD*2);
+        // 定义两个变量，temp是扩充了边界的图像，masktemp并未使用
         Mat temp(wholeSize, image.type()), masktemp;
+        // mvImagePyramid 刚开始是个空的vector
+        // 把图像金字塔该层的图像指针mvImagePyramid指向temp的中间部分（这里为浅拷贝，内存相同）
         mvImagePyramid[level] = temp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
 
         // Compute the resized image
+        // 如果不是原始图像，即图像金字塔最下层图像，计算resized后的图像
         if( level != 0 )
         {
-            resize(mvImagePyramid[level-1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);
+            // 将上一层金字塔图像根据设定sz缩放到当前层级
+            resize(mvImagePyramid[level-1],     // 输入图像
+                   mvImagePyramid[level],       // 输出图像
+                   sz,                          // 输出图像的尺寸
+                   0,                           // 水平方向上的系数，0表示自动计算
+                   0,                           // 垂直方向上的系数，0表示自动计算
+                   INTER_LINEAR);               // 图像缩放的差值算法类型，这里表示双线性插值
 
-            copyMakeBorder(mvImagePyramid[level], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
-                           BORDER_REFLECT_101+BORDER_ISOLATED);            
+            //?  原代码mvImagePyramid 并未扩充，上面resize应该改为如下
+            // resize(image,	                //输入图像
+			// 	   mvImagePyramid[level], 	//输出图像
+			// 	   sz, 						//输出图像的尺寸
+			// 	   0, 						//水平方向上的缩放系数，留0表示自动计算
+			// 	   0,  						//垂直方向上的缩放系数，留0表示自动计算
+			// 	   cv::INTER_LINEAR);		//图像缩放的差值算法类型，这里的是线性插值算法
+
+            // 把源图像拷贝到目的图像中央，四面填充指定的像素，如果图片已经拷贝到中间，只填充边界，这样做是为了正确提取FAST角点
+            // EDGE_THRESHOLD=19 指的这个边界的宽度，由于这个边界之外的像素不是源图像而是算法生成出来的，所以不能在EDGE_THRESHOLD之外提取角点
+            copyMakeBorder(mvImagePyramid[level],       // 源图像
+                           temp,                        // 目标图像
+                           EDGE_THRESHOLD, EDGE_THRESHOLD,      // top bottom 边界
+                           EDGE_THRESHOLD, EDGE_THRESHOLD,      // left right 边界
+                           BORDER_REFLECT_101+BORDER_ISOLATED);            // 扩充方式
+                    /*Various border types, image boundaries are denoted with '|'
+                    * BORDER_REPLICATE:     aaaaaa|abcdefgh|hhhhhhh
+                    * BORDER_REFLECT:       fedcba|abcdefgh|hgfedcb
+                    * BORDER_REFLECT_101:   gfedcb|abcdefgh|gfedcba
+                    * BORDER_WRAP:          cdefgh|abcdefgh|abcdefg
+                    * BORDER_CONSTANT:      iiiiii|abcdefgh|iiiiiii  with some specified 'i'
+                    */
+                //    BORDER_ISOLATED	表示对整个图像进行操作
         }
         else
         {
-            copyMakeBorder(image, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
-                           BORDER_REFLECT_101);            
+            // 如果是第0层未缩放图像，直接将图像深拷贝到temp中间，并且对其周围进行边界扩充。此时temp就是对源图像扩展后的图像
+            copyMakeBorder(image,       // 这是原图像
+                           temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+                           BORDER_REFLECT_101);      //? 并未扩充原图像      
         }
+        // //? 原代码mvImagePyramid 并未扩充，应该添加下面一行代码
+        // mvImagePyramid[level] = temp;
     }
 
 }

@@ -402,48 +402,82 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
     return nmatches;
 }
 
+/**
+ * @brief 单目初始化时用于当前帧和参考帧特征点匹配
+ * 步骤：
+ *  1. 构建旋转直方图
+ *  2. 在半径窗口内搜索当前帧中所有的候选匹配特征点
+ *  3. 遍历搜索窗口中的所有潜在的匹配候选点，找到最优和次优的
+ *  4. 对最优 次优结果进行检查，满足阈值、最优/次优比例，删除重复匹配
+ *  5. 计算匹配点旋转角度差所在的直方面
+ *  6. 筛除旋转直方图中“非主流”部分
+ *  7. 将最后通过筛选的匹配好的特征点保存
+ * @param[in] F1                参考帧
+ * @param[in] F2                当前帧
+ * @param[in] vbPrevMatched     输入时存储参考帧特征点坐标，输出更新为匹配好的当前帧的特征点坐标
+ * @param[in] vnMatches12       保存参考帧中特征点是否匹配上，索引为参考帧特征点索引，值为当前帧匹配特征点索引
+ * @param[in] windowSize        搜索窗口大小
+ * @return int                  返回成功匹配的特征点数目 
+ */
 int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
 {
     int nmatches=0;
+    // F1中特征点与F2中匹配关系，按照F1特征点数目进行空间分配
     vnMatches12 = vector<int>(F1.mvKeysUn.size(),-1);
 
+    // Step 1 构建旋转直方图 HISTO_LENGTH = 30
     vector<int> rotHist[HISTO_LENGTH];
     for(int i=0;i<HISTO_LENGTH;i++)
+        // 每个bin里预分配500个，因为使用的是vector，不够可以扩展容量
         rotHist[i].reserve(500);
+    // ? 该代码是错误的，应该是 const float factor = HISTO_LENGTH/360.f;
     const float factor = 1.0f/HISTO_LENGTH;
 
+    // 匹配点对距离，按照F2特征点数量分配空间
     vector<int> vMatchedDistance(F2.mvKeysUn.size(),INT_MAX);
+    // 从帧2到帧1的反向匹配 ， 按照F2特征点数目分配空间
     vector<int> vnMatches21(F2.mvKeysUn.size(),-1);
 
+    // 遍历F1中特征点
     for(size_t i1=0, iend1=F1.mvKeysUn.size(); i1<iend1; i1++)
     {
         cv::KeyPoint kp1 = F1.mvKeysUn[i1];
         int level1 = kp1.octave;
+        // 只能使用原始图像中的特征点，也就是金字塔第0层
         if(level1>0)
             continue;
 
+        // Step 2 在半径窗口内搜索当前帧F2中所有的候选匹配特征点
+        // vbPrevMatched 输入的是参考帧F1的特征点
+        // windowSize = 100 金字塔图像都是第0层
         vector<size_t> vIndices2 = F2.GetFeaturesInArea(vbPrevMatched[i1].x,vbPrevMatched[i1].y, windowSize,level1,level1);
 
+        // 没有找到候选特征点，则跳过
         if(vIndices2.empty())
             continue;
 
+        // 取出参考帧F1 中当前所遍历的特征点对应的描述子
         cv::Mat d1 = F1.mDescriptors.row(i1);
 
-        int bestDist = INT_MAX;
-        int bestDist2 = INT_MAX;
-        int bestIdx2 = -1;
+        int bestDist = INT_MAX;     // 最佳描述子匹配距离，Hamming距离，越小越好
+        int bestDist2 = INT_MAX;    // 次佳描述子匹配距离
+        int bestIdx2 = -1;          // 最佳候选特征点在F2中的索引
 
+        // Step 3 遍历搜索窗口中候选特征点，找到最优和次优的
         for(vector<size_t>::iterator vit=vIndices2.begin(); vit!=vIndices2.end(); vit++)
         {
             size_t i2 = *vit;
 
+            // 取出候选特征点对应的描述子
             cv::Mat d2 = F2.mDescriptors.row(i2);
 
+            // 计算当前参考帧遍历特征点和候选特征点之间描述子的距离
             int dist = DescriptorDistance(d1,d2);
 
             if(vMatchedDistance[i2]<=dist)
                 continue;
 
+            // 如果这两个特征点描述子的距离比最佳距离还小，则更新最佳距离和次佳距离，同时记录匹配的特征点索引
             if(dist<bestDist)
             {
                 bestDist2=bestDist;
@@ -452,33 +486,46 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
             }
             else if(dist<bestDist2)
             {
+                // 如果只优于次佳距离，则只更新次佳距离
                 bestDist2=dist;
             }
         }
 
+        // Step 4 对最优和次优结果进行检查，满足阈值、最优/次优比例，删除重复匹配
+        // 即使算出了最佳匹配距离，也不一定匹配成功，需满足小于阈值
         if(bestDist<=TH_LOW)
         {
+            // 最佳距离比次佳距离小于设定的阈值
             if(bestDist<(float)bestDist2*mfNNratio)
             {
+                // 如果找到的候选特征点对应F1中特征点已经匹配过了，说明发生了重复匹配，将原来的匹配也删掉
                 if(vnMatches21[bestIdx2]>=0)
                 {
                     vnMatches12[vnMatches21[bestIdx2]]=-1;
                     nmatches--;
                 }
+                // 最优的匹配关系，双向建立
+                // vnMatches12中保存的是参考帧F1与F2的匹配关系，索引为F1中特征点索引，值为F2中匹配特征点索引 vnMatches21刚好相反
                 vnMatches12[i1]=bestIdx2;
                 vnMatches21[bestIdx2]=i1;
                 vMatchedDistance[bestIdx2]=bestDist;
                 nmatches++;
 
+                // Step 5 计算匹配点旋转角度差所在的直方圆
                 if(mbCheckOrientation)
                 {
+                    // 计算匹配特征点的角度差，单位角度°，不是弧度， 范围为 [0,  360°]
                     float rot = F1.mvKeysUn[i1].angle-F2.mvKeysUn[bestIdx2].angle;
                     if(rot<0.0)
                         rot+=360.0f;
+                    // 前面factor应该是 HISTO_LENGTH/360.0f
+                    // bin = rot / 360.0f * HISTO_LENGTH，表示当前rot被分配在第几个直方图bin
                     int bin = round(rot*factor);
+                    // 如果bin 满了，则又是一个轮回
                     if(bin==HISTO_LENGTH)
                         bin=0;
                     assert(bin>=0 && bin<HISTO_LENGTH);
+                    // 将遍历的参考帧中特征点索引存储在对应的直方图中
                     rotHist[bin].push_back(i1);
                 }
             }
@@ -486,18 +533,21 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
     }
 
+    // Step 6 筛除旋转直方图中”非主流“部分
     if(mbCheckOrientation)
     {
         int ind1=-1;
         int ind2=-1;
         int ind3=-1;
 
+        // 筛选出旋转角度差落在直方图区间内数量最多的前三个bin的索引
         ComputeThreeMaxima(rotHist,HISTO_LENGTH,ind1,ind2,ind3);
 
         for(int i=0; i<HISTO_LENGTH; i++)
         {
             if(i==ind1 || i==ind2 || i==ind3)
                 continue;
+            // 剔除掉不在前三的匹配对，因为它们不符合”主流的旋转方向”
             for(size_t j=0, jend=rotHist[i].size(); j<jend; j++)
             {
                 int idx1 = rotHist[i][j];
@@ -512,6 +562,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
     }
 
     //Update prev matched
+    // Step 7 将最后通过筛选的匹配好的特征点保存到vbPrevMatched中
     for(size_t i1=0, iend1=vnMatches12.size(); i1<iend1; i1++)
         if(vnMatches12[i1]>=0)
             vbPrevMatched[i1]=F2.mvKeysUn[vnMatches12[i1]].pt;
@@ -1598,6 +1649,15 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
     return nmatches;
 }
 
+/**
+ * @brief 筛选出旋转角度差落在直方图区间内数量最多的三个bin的索引
+ * 
+ * @param[in] histo 匹配特征点对旋转方向差直方图
+ * @param[in] L     直方图尺寸（直方个数）
+ * @param[in & out] ind1  bin值第一大对应索引
+ * @param[in & out] ind2  bin值第二大对应索引
+ * @param[in & out] ind3  bin值第三大对应索引
+ */
 void ORBmatcher::ComputeThreeMaxima(vector<int>* histo, const int L, int &ind1, int &ind2, int &ind3)
 {
     int max1=0;
@@ -1630,11 +1690,13 @@ void ORBmatcher::ComputeThreeMaxima(vector<int>* histo, const int L, int &ind1, 
         }
     }
 
+    // 如果差距过大，说明次优结果不好，只取最大 ind1
     if(max2<0.1f*(float)max1)
     {
         ind2=-1;
         ind3=-1;
     }
+    // 取 ind2 ind3
     else if(max3<0.1f*(float)max1)
     {
         ind3=-1;
@@ -1644,6 +1706,7 @@ void ORBmatcher::ComputeThreeMaxima(vector<int>* histo, const int L, int &ind1, 
 
 // Bit set count operation from
 // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+// Hamming distance：两个二进制之间的汉明距离，即不同位的个数
 int ORBmatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 {
     const int *pa = a.ptr<int32_t>();
@@ -1653,7 +1716,8 @@ int ORBmatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 
     for(int i=0; i<8; i++, pa++, pb++)
     {
-        unsigned  int v = *pa ^ *pb;
+        unsigned  int v = *pa ^ *pb;    // 相同为0 不同为1
+        // 计算bit中1的个数
         v = v - ((v >> 1) & 0x55555555);
         v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
         dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;

@@ -146,19 +146,19 @@
     "todo-tree.regex.regex": "((//|#|<!--|;|/\\*|\\*|^)\\s*($TAGS)|^\\s*- \\[ \\])",
 	"todo-tree.general.tags": [
 	"?",
-	"sstep",
+	" Step",
     "c++11",
     "todo",
     "note",
     "bug"
 	],
 	"todo-tree.highlights.customHighlight": {
-	"sstep": {
-	"foreground": "#7CFC00",
-	"icon": "question",
-	"iconColour": "green",
-	"type": "text-and-comment",
-	"hideFromTree": true
+	" Step": {
+		"foreground": "#7CFC00",
+		"icon": "question",
+		"iconColour": "green",
+		"type": "text-and-comment",
+		// "hideFromTree": true
 	},
 	"?": {
 	"foreground": "red",
