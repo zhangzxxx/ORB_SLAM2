@@ -24,13 +24,18 @@
 namespace ORB_SLAM2
 {
 
+// 将描述子转换为描述子向量， 本质是 cv::Mat --> std::vector
 std::vector<cv::Mat> Converter::toDescriptorVector(const cv::Mat &Descriptors)
 {
+    // 存储转换结果的向量
     std::vector<cv::Mat> vDesc;
     vDesc.reserve(Descriptors.rows);
+    // 对于每一个特征点的描述子
     for (int j=0;j<Descriptors.rows;j++)
+        // 从描述子这个矩阵中提取出来存到向量中
         vDesc.push_back(Descriptors.row(j));
 
+    // 返回转换结果
     return vDesc;
 }
 

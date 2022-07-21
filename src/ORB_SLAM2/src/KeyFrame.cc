@@ -26,8 +26,10 @@
 namespace ORB_SLAM2
 {
 
+// 下一个关键帧id
 long unsigned int KeyFrame::nNextId=0;
 
+// 关键帧构造函数
 KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mnFrameId(F.mnId),  mTimeStamp(F.mTimeStamp), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
     mfGridElementWidthInv(F.mfGridElementWidthInv), mfGridElementHeightInv(F.mfGridElementHeightInv),
@@ -43,8 +45,10 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
     mbToBeErased(false), mbBad(false), mHalfBaseline(F.mb/2), mpMap(pMap)
 {
+    // 获取id
     mnId=nNextId++;
 
+    // 根据指定的普通帧，初始化用于加速匹配的网格对象信息。就是把每个网格中有的特征点的索引复制过来
     mGrid.resize(mnGridCols);
     for(int i=0; i<mnGridCols;i++)
     {
@@ -53,13 +57,17 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
             mGrid[i][j] = F.mGrid[i][j];
     }
 
+    // 设置当前关键帧的位姿
     SetPose(F.mTcw);    
 }
 
+// Bag of Words 计算词袋表示
 void KeyFrame::ComputeBoW()
 {
+    // 只有当词袋向量或节点和特征序号的特征向量为空时执行
     if(mBowVec.empty() || mFeatVec.empty())
     {
+        // 从当前帧的描述子转换得到词袋信息
         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
         // Feature vector associate features with nodes in the 4th level (from leaves up)
         // We assume the vocabulary tree has 6 levels, change the 4 otherwise
@@ -67,6 +75,7 @@ void KeyFrame::ComputeBoW()
     }
 }
 
+// 设置当前关键帧位姿
 void KeyFrame::SetPose(const cv::Mat &Tcw_)
 {
     unique_lock<mutex> lock(mMutexPose);
@@ -74,12 +83,18 @@ void KeyFrame::SetPose(const cv::Mat &Tcw_)
     cv::Mat Rcw = Tcw.rowRange(0,3).colRange(0,3);
     cv::Mat tcw = Tcw.rowRange(0,3).col(3);
     cv::Mat Rwc = Rcw.t();
+    // 和普通帧中进行的操作相同
     Ow = -Rwc*tcw;
 
+    // 计算当前位姿的逆
     Twc = cv::Mat::eye(4,4,Tcw.type());
     Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
     Ow.copyTo(Twc.rowRange(0,3).col(3));
+    // center为相机坐标系（左目）下，立体相机中心的坐标
+    // 立体相机中心点坐标与左目相机坐标之间只是在X轴上相差 mHalfBaseline
+    // 因此，立体相机中两个摄像头的连线为X轴，正方向为左目相机指向右目相机（齐次坐标）
     cv::Mat center = (cv::Mat_<float>(4,1) << mHalfBaseline, 0 , 0, 1);
+    // 世界坐标系下，左目相机中心到立体相机中心的向量，方向为左目相机中心指向立体相机中心
     Cw = Twc*center;
 }
 
@@ -207,6 +222,7 @@ int KeyFrame::GetWeight(KeyFrame *pKF)
         return 0;
 }
 
+// 向地图中插入地图点
 void KeyFrame::AddMapPoint(MapPoint *pMP, const size_t &idx)
 {
     unique_lock<mutex> lock(mMutexFeatures);
